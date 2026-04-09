@@ -30,6 +30,8 @@ function findClaudeTerminal() {
 }
 
 async function sendWhip(message) {
+  const { exec } = require('child_process');
+
   // try terminal first
   const claudeTerminal = findClaudeTerminal();
   if (claudeTerminal) {
@@ -41,7 +43,7 @@ async function sendWhip(message) {
     return true;
   }
 
-  // webview approach
+  // webview approach: focus → clipboard → OS-level Ctrl+V + Enter
   try {
     await vscode.commands.executeCommand('claude-vscode.focus');
   } catch {
@@ -55,21 +57,19 @@ async function sendWhip(message) {
   try { oldClipboard = await vscode.env.clipboard.readText(); } catch {}
 
   await vscode.env.clipboard.writeText(message);
+  await sleep(100);
 
-  try {
-    await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
-    await sleep(100);
-    await vscode.commands.executeCommand('type', { text: '\n' });
-    setTimeout(async () => {
-      try { await vscode.env.clipboard.writeText(oldClipboard); } catch {}
-    }, 500);
-    return true;
-  } catch {
-    vscode.window.showInformationMessage(
-      `Peitsche! "${message}" im Clipboard. Drueck Ctrl+V + Enter!`
-    );
-    return false;
-  }
+  // simulate Ctrl+V + Enter at OS level via PowerShell
+  await new Promise((resolve) => {
+    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v{ENTER}")`;
+    exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, () => resolve());
+  });
+
+  setTimeout(async () => {
+    try { await vscode.env.clipboard.writeText(oldClipboard); } catch {}
+  }, 800);
+
+  return true;
 }
 
 function getWhipHtml() {
