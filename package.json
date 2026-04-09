@@ -1,0 +1,39 @@
+{
+  "name": "claude-peitsche",
+  "displayName": "Claude Peitsche",
+  "description": "Peitsche deinen Claude Code an! Ein Whip-Button der 'Weiter' fuer dich drueckt.",
+  "version": "0.0.1",
+  "publisher": "JannisArineo",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claude-peitsche.whip",
+        "title": "Peitsche! Claude antreiben",
+        "category": "Claude Peitsche"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "claude-peitsche.whip",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter"
+      }
+    ]
+  },
+  "extensionDependencies": [
+    "anthropic.claude-code"
+  ],
+  "devDependencies": {
+    "@vscode/vsce": "^3.7.1"
+  }
+}
