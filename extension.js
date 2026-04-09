@@ -46,44 +46,22 @@ async function sendWhip() {
     return true;
   }
 
-  // webview approach: focus → clipboard → OS-level Ctrl+V + Enter
-  const claudeFocusCommands = [
-    'claude.focus',
-    'workbench.panel.claude.focus',
-    'claude-vscode.focus',
-  ];
-
-  let focused = false;
-  for (const cmd of claudeFocusCommands) {
-    try {
-      await vscode.commands.executeCommand(cmd);
-      focused = true;
-      break;
-    } catch {}
-  }
-
-  if (!focused) {
+  // webview approach: focus Claude panel → type "y" + Enter via OS-level keystrokes
+  try {
+    await vscode.commands.executeCommand('claude-vscode.focus');
+  } catch {
     vscode.window.showWarningMessage('Claude Code nicht gefunden. Ist es offen?');
     return false;
   }
 
-  await sleep(200);
+  // wait for webview to actually receive focus
+  await sleep(400);
 
-  let oldClipboard = '';
-  try { oldClipboard = await vscode.env.clipboard.readText(); } catch {}
-
-  await vscode.env.clipboard.writeText(YES);
-  await sleep(100);
-
-  // simulate Ctrl+V + Enter at OS level via PowerShell
+  // type "y" + Enter directly — no clipboard needed
   await new Promise((resolve) => {
-    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v{ENTER}")`;
+    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("y{ENTER}")`;
     exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, () => resolve());
   });
-
-  setTimeout(async () => {
-    try { await vscode.env.clipboard.writeText(oldClipboard); } catch {}
-  }, 800);
 
   return true;
 }
