@@ -31,8 +31,8 @@
       },
       {
         "command": "claude-peitsche.toggle",
-        "key": "ctrl+shift+p ctrl+shift+w",
-        "mac": "cmd+shift+p cmd+shift+w"
+        "key": "ctrl+shift+alt+w",
+        "mac": "cmd+shift+alt+w"
       }
     ],
     "views": {
