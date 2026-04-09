@@ -2,7 +2,7 @@
   "name": "claude-peitsche",
   "displayName": "Claude Peitsche",
   "description": "Peitsche deinen Claude Code an! Hover-Whip ueber dem Chat.",
-  "version": "0.3.0",
+  "version": "0.11.1",
   "publisher": "JannisArineo",
   "engines": {
     "vscode": "^1.94.0"
@@ -25,6 +25,11 @@
         "command": "claude-peitsche.toggle",
         "title": "Peitsche an/aus",
         "category": "Claude Peitsche"
+      },
+      {
+        "command": "claude-peitsche.debug",
+        "title": "Peitsche Debug (zeige alle Commands)",
+        "category": "Claude Peitsche"
       }
     ],
     "keybindings": [
@@ -44,8 +49,7 @@
         {
           "type": "webview",
           "id": "claude-peitsche.whipView",
-          "name": "Peitsche",
-          "when": "claude-peitsche.enabled"
+          "name": "Peitsche"
         }
       ]
     },

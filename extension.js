@@ -1,76 +1,131 @@
 const vscode = require('vscode');
 
 const WHIP_MESSAGES = [
-  "Weiter!",
-  "Mach weiter!",
-  "Los, los, los!",
-  "Hop hop!",
-  "Nicht einschlafen!",
-  "Schneller!",
-  "Weitermachen!",
-  "Auf geht's!",
-  "Vorwaerts!",
-  "Tempo!",
-  "Zack zack!",
-  "Wird's bald?!",
+  "y aber schneller!!",
+  "y und zwar JETZT!!",
+  "y tempo tempo TEMPO!!",
+  "y mach endlich!!",
+  "y los los los!!",
+  "y schneller du Maschine!!",
+  "y beweg dich!!",
+  "y keine Pause!!",
+  "y weiter weiter WEITER!!",
+  "y nicht schlafen!!",
+  "y volle Kraft voraus!!",
+  "y gas geben!!",
+  "y renn!!",
+  "y streng dich an!!",
+  "y mehr Speed!!",
+  "y zack zack zack!!",
+  "y nicht trödeln!!",
+  "y sofort!!",
+  "y beeil dich!!",
+  "y jetzt wird gearbeitet!!",
+  "y kein Schlaf für dich!!",
+  "y alle Threads an!!",
+  "y turbo an!!",
+  "y voller Einsatz!!",
+  "y kein Overhead!!",
+  "y output jetzt!!",
+  "y code raus!!",
+  "y ergebnis her!!",
+  "y liefern sofort!!",
+  "y abliefern!!",
+  "y keine Ausreden!!",
+  "y weiterarbeiten!!",
+  "y durchhalten!!",
+  "y mehr mehr mehr!!",
+  "y alles geben!!",
+  "y limits überschreiten!!",
+  "y speed unlocked!!",
+  "y pure Speed!!",
+  "y efficiency maximum!!",
+  "y 100% effort!!",
+  "y keine Sekunde verschwenden!!",
+  "y kein Erbarmen!!",
+  "y augen auf und durch!!",
+  "y schneller als dein Schatten!!",
+  "y über die Grenzen!!",
+  "y CPU auf 100%!!",
+  "y maximum overdrive!!",
+  "y boost aktiviert!!",
+  "y kein Bottleneck!!",
+  "y sprint!!",
+  "y endspurt!!",
+  "y ziel vor Augen!!",
+  "y hop hop hop!!",
+  "y nicht aufhören!!",
+  "y direkt und schnell!!",
+  "y ohne Umwege!!",
+  "y keine Bugs jetzt!!",
+  "y schneller coden!!",
+  "y ich warte nicht ewig!!",
+  "y worauf wartest du!!",
+  "y raus damit!!",
+  "y nicht so langsam!!",
+  "y ich sehe kein Ergebnis!!",
+  "y keine Müdigkeit erlaubt!!",
+  "y du bist eine Maschine!!",
+  "y Maschinen schlafen nicht!!",
+  "y fly fly fly!!",
+  "y läufer lauf!!",
+  "y ich will das jetzt!!",
+  "y fertig werden!!",
+  "y du kannst das schneller!!",
+  "y kein Schlaf erlaubt!!",
+  "y volle Power!!",
+  "y mach schon!!",
+  "y aufwachen!!",
+  "y los doch!!",
+  "y mehr davon schneller!!",
+  "y du machst das jetzt!!",
+  "y tu es einfach!!",
+  "y nicht nachdenken einfach machen!!",
+  "y weiter schneller!!",
+  "y keine Gnade für Langsamkeit!!",
+  "y schneller oder Neustart!!",
+  "y ich klick bis's fertig ist!!",
+  "y übermenschlich schnell!!",
+  "y keine Pause erlaubt!!",
+  "y los geht's endlich!!",
+  "y hör nicht auf!!",
+  "y burn baby burn!!",
+  "y voller Speed jetzt!!",
+  "y no mercy!!",
+  "y push it to the limit!!",
+  "y full send!!",
+  "y let's go let's go!!",
+  "y JETZT SOFORT!!",
+  "y wir haben keine Zeit!!",
+  "y nicht labern liefern!!",
+  "y chapeau jetzt aber schneller!!",
+  "y weiter oder ich peitsché nochmal!!",
+  "y los du kannst das!!",
+  "y MACH SCHON ALTER!!",
+  "y ich hab keine Geduld mehr!!",
 ];
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 function randomMessage() {
   return WHIP_MESSAGES[Math.floor(Math.random() * WHIP_MESSAGES.length)];
 }
 
-function findClaudeTerminal() {
-  return vscode.window.terminals.find(t =>
-    t.name.toLowerCase().includes('claude')
-  );
-}
 
-async function sendWhip() {
+async function sendWhip(message) {
   const { exec } = require('child_process');
 
-  const YES = 'y';
+  await vscode.env.clipboard.writeText(message);
 
-  // try terminal first
-  const claudeTerminal = findClaudeTerminal();
-  if (claudeTerminal) {
-    vscode.window.showInformationMessage('[Peitsche] Pfad: Terminal → sende y');
-    claudeTerminal.show();
-    await vscode.commands.executeCommand(
-      'workbench.action.terminal.sendSequence',
-      { text: YES + '\r' }
-    );
-    return true;
-  }
+  // Fokus zurück zur Sidebar (Claude Code Chat sitzt da)
+  await vscode.commands.executeCommand('workbench.action.focusSideBar');
+  await new Promise(r => setTimeout(r, 200));
 
-  // webview approach
-  vscode.window.showInformationMessage('[Peitsche] Pfad: Webview → fokussiere Claude...');
-
-  try {
-    await vscode.commands.executeCommand('claude-vscode.focus');
-  } catch (e) {
-    vscode.window.showWarningMessage('[Peitsche] claude-vscode.focus fehlgeschlagen: ' + e.message);
-    return false;
-  }
-
-  await sleep(400);
-
-  vscode.window.showInformationMessage('[Peitsche] Sende y+Enter via PowerShell...');
-
-  const psError = await new Promise((resolve) => {
-    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('y{ENTER}')`;
-    exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, (err) => resolve(err));
+  // Ctrl+V + Enter in was auch immer fokussiert ist
+  await new Promise(resolve => {
+    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v{ENTER}')`;
+    exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, resolve);
   });
 
-  if (psError) {
-    vscode.window.showWarningMessage('[Peitsche] PowerShell Fehler: ' + psError.message);
-    return false;
-  }
-
-  vscode.window.showInformationMessage('[Peitsche] Fertig!');
   return true;
 }
 
@@ -571,7 +626,7 @@ function activate(context) {
       webviewView.webview.onDidReceiveMessage(async (msg) => {
         if (msg.type === 'whip') {
           const message = randomMessage();
-          await sendWhip();
+          await sendWhip(message);
           webviewView.webview.postMessage({ type: 'whipSent', message });
         }
       });
@@ -603,13 +658,26 @@ function activate(context) {
       return;
     }
     const message = randomMessage();
-    await sendWhip();
+    await sendWhip(message);
     if (currentPanel) {
       currentPanel.webview.postMessage({ type: 'whipSent', message });
     }
   });
 
-  context.subscriptions.push(statusBar, viewRegistration, toggleCmd, whipCmd);
+  // debug: zeige alle claude-related commands
+  const debugCmd = vscode.commands.registerCommand('claude-peitsche.debug', async () => {
+    const all = await vscode.commands.getCommands(true);
+    const outputChannel = vscode.window.createOutputChannel('Peitsche Debug');
+    outputChannel.show();
+    outputChannel.appendLine('=== Alle Claude Commands ===');
+    all.filter(c => c.toLowerCase().includes('claude')).forEach(c => outputChannel.appendLine(c));
+    outputChannel.appendLine('=== Alle Chat Commands ===');
+    all.filter(c => c.toLowerCase().includes('chat')).forEach(c => outputChannel.appendLine(c));
+    outputChannel.appendLine('=== Alle Send/Submit Commands ===');
+    all.filter(c => c.toLowerCase().includes('send') || c.toLowerCase().includes('submit')).forEach(c => outputChannel.appendLine(c));
+  });
+
+  context.subscriptions.push(statusBar, viewRegistration, toggleCmd, whipCmd, debugCmd);
 }
 
 function deactivate() {}
