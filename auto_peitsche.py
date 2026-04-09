@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Auto-Peitsche v1.0
 Erkennt automatisch wenn Claude Code auf Input wartet und schickt die Peitsche.
@@ -15,6 +16,8 @@ Voraussetzungen:
 
 import time
 import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 import numpy as np
 import keyboard
 import mss
@@ -29,6 +32,7 @@ CHECK_INTERVAL     = 0.4   # Sekunden zwischen Screenshots
 STABLE_THRESHOLD   = 2.5   # Sekunden Stille = Claude wartet → Peitsche
 CHANGE_THRESHOLD   = 8     # Pixeldifferenz ab der Claude als "aktiv" gilt
 COOLDOWN           = 12.0  # Mindestabstand zwischen zwei Auto-Peitschen (Sekunden)
+IDLE_THRESHOLD     = 8.0   # Sekunden Stille OHNE vorherige Aktivität → trotzdem peitschen
 PANEL_RATIO_LEFT   = 0.55  # Claude Panel startet bei X% der Fensterbreite
 PANEL_RATIO_TOP    = 0.05  # Claude Panel startet bei Y% der Fensterhöhe
 PANEL_RATIO_RIGHT  = 1.0   # Claude Panel endet bei X% der Fensterbreite
@@ -147,13 +151,20 @@ def main():
                 stable_for = now - last_change
                 active_printed = False
 
-                if was_active and stable_for >= STABLE_THRESHOLD:
-                    # War aktiv, jetzt stabil → Claude wartet
+                should_whip = (
+                    (was_active and stable_for >= STABLE_THRESHOLD) or
+                    (not was_active and stable_for >= IDLE_THRESHOLD)
+                )
+
+                if should_whip:
+                    # Claude wartet (nach Aktivität oder direkt im Idle)
                     if now - last_whip >= COOLDOWN:
-                        print(f"[!] Claude wartet seit {stable_for:.1f}s → Peitsche!")
+                        reason = "nach Aktivität" if was_active else "direkt wartend (Idle)"
+                        print(f"[!] Claude wartet seit {stable_for:.1f}s ({reason}) → Peitsche!")
                         send_whip()
                         last_whip  = now
                         was_active = False
+                        last_change = now  # Reset damit nicht sofort wieder feuert
                     else:
                         remaining = COOLDOWN - (now - last_whip)
                         print(f"[~] Cooldown: noch {remaining:.0f}s warten...")
