@@ -29,8 +29,11 @@ function findClaudeTerminal() {
   );
 }
 
-async function sendWhip(message) {
+async function sendWhip() {
   const { exec } = require('child_process');
+
+  // Always send "y" — the correct yes-response for Claude Code permission prompts
+  const YES = 'y';
 
   // try terminal first
   const claudeTerminal = findClaudeTerminal();
@@ -38,15 +41,28 @@ async function sendWhip(message) {
     claudeTerminal.show();
     await vscode.commands.executeCommand(
       'workbench.action.terminal.sendSequence',
-      { text: message + '\r' }
+      { text: YES + '\r' }
     );
     return true;
   }
 
   // webview approach: focus → clipboard → OS-level Ctrl+V + Enter
-  try {
-    await vscode.commands.executeCommand('claude-vscode.focus');
-  } catch {
+  const claudeFocusCommands = [
+    'claude.focus',
+    'workbench.panel.claude.focus',
+    'claude-vscode.focus',
+  ];
+
+  let focused = false;
+  for (const cmd of claudeFocusCommands) {
+    try {
+      await vscode.commands.executeCommand(cmd);
+      focused = true;
+      break;
+    } catch {}
+  }
+
+  if (!focused) {
     vscode.window.showWarningMessage('Claude Code nicht gefunden. Ist es offen?');
     return false;
   }
@@ -56,7 +72,7 @@ async function sendWhip(message) {
   let oldClipboard = '';
   try { oldClipboard = await vscode.env.clipboard.readText(); } catch {}
 
-  await vscode.env.clipboard.writeText(message);
+  await vscode.env.clipboard.writeText(YES);
   await sleep(100);
 
   // simulate Ctrl+V + Enter at OS level via PowerShell
@@ -251,7 +267,7 @@ function activate(context) {
       webviewView.webview.onDidReceiveMessage(async (msg) => {
         if (msg.type === 'whip') {
           const message = randomMessage();
-          await sendWhip(message);
+          await sendWhip();
           webviewView.webview.postMessage({ type: 'whipSent', message });
         }
       });
@@ -283,7 +299,7 @@ function activate(context) {
       return;
     }
     const message = randomMessage();
-    await sendWhip(message);
+    await sendWhip();
     if (currentPanel) {
       currentPanel.webview.postMessage({ type: 'whipSent', message });
     }

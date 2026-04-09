@@ -2,7 +2,7 @@
   "name": "claude-peitsche",
   "displayName": "Claude Peitsche",
   "description": "Peitsche deinen Claude Code an! Hover-Whip ueber dem Chat.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "JannisArineo",
   "engines": {
     "vscode": "^1.94.0"
