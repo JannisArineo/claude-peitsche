@@ -2,13 +2,17 @@
   "name": "claude-peitsche",
   "displayName": "Claude Peitsche",
   "description": "Peitsche deinen Claude Code an! Hover-Whip ueber dem Chat.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "JannisArineo",
   "engines": {
     "vscode": "^1.94.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
@@ -56,6 +60,7 @@
     }
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.7.1"
+    "@vscode/vsce": "^3.7.1",
+    "jest": "^30.3.0"
   }
 }

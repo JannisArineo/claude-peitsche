@@ -32,12 +32,12 @@ function findClaudeTerminal() {
 async function sendWhip() {
   const { exec } = require('child_process');
 
-  // Always send "y" — the correct yes-response for Claude Code permission prompts
   const YES = 'y';
 
   // try terminal first
   const claudeTerminal = findClaudeTerminal();
   if (claudeTerminal) {
+    vscode.window.showInformationMessage('[Peitsche] Pfad: Terminal → sende y');
     claudeTerminal.show();
     await vscode.commands.executeCommand(
       'workbench.action.terminal.sendSequence',
@@ -46,23 +46,31 @@ async function sendWhip() {
     return true;
   }
 
-  // webview approach: focus Claude panel → type "y" + Enter via OS-level keystrokes
+  // webview approach
+  vscode.window.showInformationMessage('[Peitsche] Pfad: Webview → fokussiere Claude...');
+
   try {
     await vscode.commands.executeCommand('claude-vscode.focus');
-  } catch {
-    vscode.window.showWarningMessage('Claude Code nicht gefunden. Ist es offen?');
+  } catch (e) {
+    vscode.window.showWarningMessage('[Peitsche] claude-vscode.focus fehlgeschlagen: ' + e.message);
     return false;
   }
 
-  // wait for webview to actually receive focus
   await sleep(400);
 
-  // type "y" + Enter directly — no clipboard needed
-  await new Promise((resolve) => {
-    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("y{ENTER}")`;
-    exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, () => resolve());
+  vscode.window.showInformationMessage('[Peitsche] Sende y+Enter via PowerShell...');
+
+  const psError = await new Promise((resolve) => {
+    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('y{ENTER}')`;
+    exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, (err) => resolve(err));
   });
 
+  if (psError) {
+    vscode.window.showWarningMessage('[Peitsche] PowerShell Fehler: ' + psError.message);
+    return false;
+  }
+
+  vscode.window.showInformationMessage('[Peitsche] Fertig!');
   return true;
 }
 
@@ -80,7 +88,29 @@ function getWhipHtml() {
     background: transparent;
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    cursor: none;
   }
+
+  /* Custom whip cursor */
+  #whipCursor {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+    transform-origin: 4px 4px;
+  }
+
+  /* Flash overlay */
+  #flashOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 60, 60, 0.2);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9990;
+    border-radius: 8px;
+  }
+
   .whip-zone {
     display: flex;
     flex-direction: column;
@@ -88,120 +118,416 @@ function getWhipHtml() {
     justify-content: center;
     width: 100%;
     height: 100%;
-    cursor: pointer;
+    cursor: none;
     transition: background 0.2s;
     border-radius: 8px;
     position: relative;
+    user-select: none;
   }
   .whip-zone:hover {
-    background: rgba(255, 80, 80, 0.1);
+    background: rgba(255, 80, 80, 0.07);
   }
-  .whip-zone:hover .whip-icon {
-    animation: whipSwing 0.4s ease-in-out infinite alternate;
-    filter: drop-shadow(0 0 12px rgba(255, 60, 60, 0.6));
+
+  /* Bot */
+  #botWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
-  .whip-zone:hover .hint {
-    opacity: 1;
-  }
-  .whip-zone:active .whip-icon {
-    animation: whipStrike 0.15s ease-out;
-    filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.9));
-  }
-  .whip-zone:active .crack {
-    opacity: 1;
-    animation: crackFlash 0.3s ease-out;
-  }
-  .whip-icon {
-    font-size: 64px;
+  #aiBot {
+    width: 110px;
+    height: 130px;
+    filter: drop-shadow(0 0 8px rgba(0, 136, 255, 0.3));
     transition: filter 0.2s;
-    user-select: none;
-    line-height: 1;
   }
+  #aiBot.scared {
+    filter: drop-shadow(0 0 12px rgba(255, 60, 60, 0.7));
+    animation: botShake 0.45s ease-in-out;
+  }
+  #aiBot.nervous {
+    animation: botBob 0.6s ease-in-out infinite alternate;
+  }
+
   .hint {
-    margin-top: 12px;
-    font-size: 13px;
+    margin-top: 10px;
+    font-size: 11px;
     color: var(--vscode-descriptionForeground);
-    opacity: 0.4;
+    opacity: 0.3;
     transition: opacity 0.2s;
     text-align: center;
   }
-  .crack {
-    position: absolute;
-    font-size: 28px;
-    opacity: 0;
-    pointer-events: none;
-    color: #ff4444;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
-  }
+  .whip-zone:hover .hint { opacity: 0.7; }
+
   .message-flash {
     position: absolute;
-    bottom: 15%;
-    font-size: 16px;
+    bottom: -28px;
+    font-size: 14px;
     font-weight: bold;
     color: #ff6b6b;
     opacity: 0;
     pointer-events: none;
-    text-shadow: 0 0 8px rgba(255, 107, 107, 0.5);
+    text-shadow: 0 0 8px rgba(255, 107, 107, 0.6);
+    white-space: nowrap;
   }
-  .message-flash.show {
-    animation: messagePopup 1s ease-out forwards;
+
+  /* Crack particles */
+  .crack-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9995;
+    font-size: 18px;
+    font-weight: bold;
+    color: #ff4444;
+    text-shadow: 0 0 8px rgba(255, 68, 68, 0.9);
+    opacity: 0;
   }
-  @keyframes whipSwing {
-    from { transform: rotate(-8deg); }
-    to { transform: rotate(8deg); }
+  .spark {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9994;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    transition: all 0.35s ease-out;
   }
-  @keyframes whipStrike {
-    0% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(-30deg) scale(1.3); }
-    100% { transform: rotate(5deg) scale(1); }
+
+  @keyframes botShake {
+    0%,100% { transform: translateX(0) rotate(0deg); }
+    12%  { transform: translateX(-9px) rotate(-4deg); }
+    25%  { transform: translateX(9px)  rotate(4deg); }
+    37%  { transform: translateX(-6px) rotate(-2deg); }
+    50%  { transform: translateX(6px)  rotate(2deg); }
+    62%  { transform: translateX(-3px) rotate(-1deg); }
+    75%  { transform: translateX(3px)  rotate(1deg); }
   }
-  @keyframes crackFlash {
-    0% { opacity: 1; transform: scale(0.5); }
-    50% { opacity: 1; transform: scale(1.5); }
-    100% { opacity: 0; transform: scale(2); }
+  @keyframes botBob {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-4px); }
   }
-  @keyframes messagePopup {
-    0% { opacity: 0; transform: translateY(0) scale(0.8); }
-    20% { opacity: 1; transform: translateY(-10px) scale(1.1); }
-    80% { opacity: 1; transform: translateY(-25px) scale(1); }
-    100% { opacity: 0; transform: translateY(-40px) scale(0.9); }
+  @keyframes crackPop {
+    0%   { opacity: 1; transform: scale(0.4) rotate(-8deg); }
+    40%  { opacity: 1; transform: scale(1.4) rotate(4deg); }
+    100% { opacity: 0; transform: scale(1.9) rotate(-4deg) translateY(-28px); }
+  }
+  @keyframes flashFade {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes msgPopup {
+    0%   { opacity: 0; transform: translateY(0)    scale(0.8); }
+    20%  { opacity: 1; transform: translateY(-8px)  scale(1.1); }
+    75%  { opacity: 1; transform: translateY(-22px) scale(1);   }
+    100% { opacity: 0; transform: translateY(-38px) scale(0.9); }
+  }
+  @keyframes antennaBlink {
+    0%,88%,100% { opacity: 1; }
+    93% { opacity: 0.15; }
+  }
+  @keyframes eyeGlow {
+    from { r: 5; }
+    to   { r: 6; }
   }
 </style>
 </head>
 <body>
+
+  <!-- Custom whip cursor (follows mouse via JS) -->
+  <svg id="whipCursor" width="38" height="38" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="hg" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#7B4A2D"/>
+        <stop offset="1" stop-color="#3D1F0A"/>
+      </linearGradient>
+    </defs>
+    <!-- Handle -->
+    <rect x="2" y="1" width="10" height="5" rx="2.5" fill="url(#hg)"/>
+    <line x1="5"  y1="1" x2="5"  y2="6" stroke="#2a1005" stroke-width="0.8"/>
+    <line x1="8"  y1="1" x2="8"  y2="6" stroke="#2a1005" stroke-width="0.8"/>
+    <line x1="11" y1="1" x2="11" y2="6" stroke="#2a1005" stroke-width="0.8"/>
+    <!-- Whip body (path changes on click via JS) -->
+    <path id="whipPath"
+          d="M12,3.5 Q20,1 26,9 Q31,16 36,34"
+          stroke="#8B4513" stroke-width="2.8" fill="none"
+          stroke-linecap="round"/>
+    <path d="M12,3.5 Q20,1 26,9 Q31,16 36,34"
+          id="whipPathShine"
+          stroke="#C0724A" stroke-width="1" fill="none"
+          stroke-linecap="round" opacity="0.45"/>
+    <!-- Tip crack lines (shown momentarily on strike) -->
+    <g id="whipCrackLines" opacity="0">
+      <line x1="36" y1="34" x2="38" y2="27" stroke="#FF3333" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="36" y1="34" x2="38" y2="37" stroke="#FF7777" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+  </svg>
+
+  <!-- Screen flash -->
+  <div id="flashOverlay"></div>
+
   <div class="whip-zone" id="whipZone">
-    <div class="whip-icon" id="whipIcon">&#129704;</div>
-    <div class="hint">Hover & Klick zum Auspeitschen</div>
-    <div class="crack" id="crack">PEITSCH!</div>
-    <div class="message-flash" id="msgFlash"></div>
+    <div id="botWrapper">
+
+      <!-- AI Bot SVG -->
+      <svg id="aiBot" viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+
+        <!-- Antenna -->
+        <line x1="60" y1="8" x2="60" y2="22"
+              stroke="#555" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="60" cy="6" r="5.5" fill="#44ff88"
+                style="animation: antennaBlink 3.5s infinite;"/>
+        <circle cx="60" cy="6" r="5.5" fill="#44ff88" opacity="0.25"/>
+
+        <!-- Head shell -->
+        <rect x="16" y="22" width="88" height="70" rx="13"
+              fill="#1a1a2e" stroke="#38385c" stroke-width="1.5"/>
+        <!-- Head inner screen -->
+        <rect x="22" y="28" width="76" height="58" rx="9"
+              fill="#0a0a18" stroke="#252540" stroke-width="1"/>
+        <!-- Subtle screen glare -->
+        <rect x="26" y="30" width="68" height="8" rx="4"
+              fill="white" opacity="0.03"/>
+
+        <!-- === NORMAL EYES === -->
+        <g id="eyesNormal">
+          <!-- Left eye -->
+          <circle cx="43" cy="51" r="12" fill="#0a0a18" stroke="#222244" stroke-width="1"/>
+          <circle cx="43" cy="51" r="9"  fill="#003a99"/>
+          <circle cx="43" cy="51" r="6"  fill="#0077ee"/>
+          <circle cx="43" cy="51" r="3.5" fill="#44aaff"/>
+          <circle cx="44.5" cy="49" r="1.8" fill="white" opacity="0.6"/>
+          <!-- glow ring -->
+          <circle cx="43" cy="51" r="11" fill="none"
+                  stroke="#0077ee" stroke-width="0.6" opacity="0.4"/>
+          <!-- Right eye -->
+          <circle cx="77" cy="51" r="12" fill="#0a0a18" stroke="#222244" stroke-width="1"/>
+          <circle cx="77" cy="51" r="9"  fill="#003a99"/>
+          <circle cx="77" cy="51" r="6"  fill="#0077ee"/>
+          <circle cx="77" cy="51" r="3.5" fill="#44aaff"/>
+          <circle cx="78.5" cy="49" r="1.8" fill="white" opacity="0.6"/>
+          <circle cx="77" cy="51" r="11" fill="none"
+                  stroke="#0077ee" stroke-width="0.6" opacity="0.4"/>
+        </g>
+
+        <!-- === SCARED EYES === -->
+        <g id="eyesScared" display="none">
+          <!-- Left eye wide + red -->
+          <circle cx="43" cy="51" r="14" fill="#0a0a18" stroke="#aa2222" stroke-width="1.2"/>
+          <circle cx="43" cy="51" r="10" fill="#660000"/>
+          <circle cx="43" cy="51" r="6"  fill="#cc1111"/>
+          <circle cx="40" cy="48" r="3"  fill="white" opacity="0.75"/>
+          <!-- Right eye wide + red -->
+          <circle cx="77" cy="51" r="14" fill="#0a0a18" stroke="#aa2222" stroke-width="1.2"/>
+          <circle cx="77" cy="51" r="10" fill="#660000"/>
+          <circle cx="77" cy="51" r="6"  fill="#cc1111"/>
+          <circle cx="74" cy="48" r="3"  fill="white" opacity="0.75"/>
+          <!-- Sweat drop -->
+          <path d="M91 26 Q94.5 33 91 38 Q87.5 33 91 26Z"
+                fill="#88ccff" opacity="0.85"/>
+        </g>
+
+        <!-- === NORMAL MOUTH === -->
+        <g id="mouthNormal">
+          <path d="M38 70 Q60 79 82 70"
+                stroke="#445" stroke-width="2.5"
+                fill="none" stroke-linecap="round"/>
+        </g>
+
+        <!-- === SCARED MOUTH === -->
+        <g id="mouthScared" display="none">
+          <ellipse cx="60" cy="71" rx="15" ry="9" fill="#1a0000"/>
+          <path d="M45 71 Q60 80 75 71"
+                stroke="#440000" stroke-width="1" fill="none"/>
+        </g>
+
+        <!-- Side connectors/lights -->
+        <line x1="16" y1="44" x2="7"  y2="44" stroke="#252540" stroke-width="1.5"/>
+        <circle cx="6"  cy="44" r="3.2" fill="#44ff88" opacity="0.65"/>
+        <line x1="16" y1="57" x2="9"  y2="57" stroke="#252540" stroke-width="1"/>
+        <circle cx="8"  cy="57" r="2.2" fill="#ff8844" opacity="0.5"/>
+
+        <line x1="104" y1="44" x2="113" y2="44" stroke="#252540" stroke-width="1.5"/>
+        <circle cx="114" cy="44" r="3.2" fill="#44ff88" opacity="0.65"/>
+        <line x1="104" y1="57" x2="111" y2="57" stroke="#252540" stroke-width="1"/>
+        <circle cx="112" cy="57" r="2.2" fill="#ff8844" opacity="0.5"/>
+
+        <!-- Body -->
+        <rect x="26" y="90" width="68" height="30" rx="9"
+              fill="#12122a" stroke="#252540" stroke-width="1.5"/>
+        <!-- Label plate -->
+        <rect x="34" y="96" width="52" height="18" rx="5"
+              fill="#080818" stroke="#2a2a55" stroke-width="1"/>
+        <text x="60" y="108" text-anchor="middle"
+              font-family="'Courier New', monospace"
+              font-size="9" fill="#5599ff" font-weight="bold"
+              letter-spacing="1">CLAUDE AI</text>
+        <!-- Body status lights -->
+        <circle cx="31" cy="105" r="3.2" fill="#44ff88" opacity="0.7"/>
+        <circle cx="89" cy="105" r="3.2" fill="#4488ff" opacity="0.7"/>
+      </svg>
+
+      <div class="message-flash" id="msgFlash"></div>
+    </div>
+
+    <div class="hint">Hover &amp; Klick zum Auspeitschen</div>
   </div>
+
+  <!-- Particle container -->
+  <div id="particles"></div>
+
   <script>
-    const vscode = acquireVsCodeApi();
-    const zone = document.getElementById('whipZone');
-    const crack = document.getElementById('crack');
-    const msgFlash = document.getElementById('msgFlash');
+    const vscode      = acquireVsCodeApi();
+    const zone        = document.getElementById('whipZone');
+    const whipCursor  = document.getElementById('whipCursor');
+    const whipPath    = document.getElementById('whipPath');
+    const whipShine   = document.getElementById('whipPathShine');
+    const crackLines  = document.getElementById('whipCrackLines');
+    const flashOverlay = document.getElementById('flashOverlay');
+    const msgFlash    = document.getElementById('msgFlash');
+    const aiBot       = document.getElementById('aiBot');
+    const eyesNormal  = document.getElementById('eyesNormal');
+    const eyesScared  = document.getElementById('eyesScared');
+    const mouthNormal = document.getElementById('mouthNormal');
+    const mouthScared = document.getElementById('mouthScared');
+    const particles   = document.getElementById('particles');
 
-    zone.addEventListener('click', () => {
-      vscode.postMessage({ type: 'whip' });
+    const NORMAL_PATH = 'M12,3.5 Q20,1 26,9 Q31,16 36,34';
+    const WINDUP_PATH = 'M12,3.5 Q13,9 15,18 Q16,25 17,34';
 
-      // crack position
-      crack.style.top = (20 + Math.random() * 30) + '%';
-      crack.style.left = (20 + Math.random() * 60) + '%';
-      crack.style.opacity = '1';
-      crack.style.animation = 'none';
-      void crack.offsetWidth;
-      crack.style.animation = 'crackFlash 0.3s ease-out';
-      setTimeout(() => { crack.style.opacity = '0'; }, 300);
+    let mx = 0, my = 0;
+    let isHovering = false;
+    let isScared = false;
+    let scaredTimer = null;
+
+    // --- Cursor follow ---
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      whipCursor.style.left = e.clientX + 'px';
+      whipCursor.style.top  = e.clientY + 'px';
     });
 
-    window.addEventListener('message', (e) => {
+    zone.addEventListener('mouseenter', () => {
+      isHovering = true;
+      whipCursor.style.display = 'block';
+      if (!isScared) startNervous();
+    });
+    zone.addEventListener('mouseleave', () => {
+      isHovering = false;
+      whipCursor.style.display = 'none';
+      if (!isScared) stopNervous();
+    });
+
+    // Wind-up on mousedown
+    zone.addEventListener('mousedown', () => {
+      whipPath.setAttribute('d', WINDUP_PATH);
+      whipShine.setAttribute('d', WINDUP_PATH);
+    });
+
+    // Restore on mouseup without click (drag out)
+    zone.addEventListener('mouseup', () => {
+      setTimeout(() => {
+        whipPath.setAttribute('d', NORMAL_PATH);
+        whipShine.setAttribute('d', NORMAL_PATH);
+      }, 120);
+    });
+
+    // CRACK on click
+    zone.addEventListener('click', e => {
+      // Snap whip back + show crack tip
+      whipPath.setAttribute('d', NORMAL_PATH);
+      whipShine.setAttribute('d', NORMAL_PATH);
+      crackLines.style.opacity = '1';
+      setTimeout(() => { crackLines.style.opacity = '0'; }, 140);
+
+      // Screen flash
+      flashOverlay.style.animation = 'none';
+      void flashOverlay.offsetWidth;
+      flashOverlay.style.animation = 'flashFade 0.35s ease-out forwards';
+
+      // Particles at click
+      spawnParticles(e.clientX, e.clientY);
+
+      // Bot scared
+      triggerScared();
+
+      vscode.postMessage({ type: 'whip' });
+    });
+
+    // --- Bot states ---
+    function startNervous() {
+      aiBot.classList.remove('scared');
+      aiBot.classList.add('nervous');
+    }
+    function stopNervous() {
+      aiBot.classList.remove('nervous');
+    }
+    function triggerScared() {
+      clearTimeout(scaredTimer);
+      isScared = true;
+      aiBot.classList.remove('nervous');
+      aiBot.classList.remove('scared');
+      void aiBot.offsetWidth;
+      aiBot.classList.add('scared');
+
+      eyesNormal.setAttribute('display', 'none');
+      eyesScared.setAttribute('display', 'block');
+      mouthNormal.setAttribute('display', 'none');
+      mouthScared.setAttribute('display', 'block');
+
+      scaredTimer = setTimeout(() => {
+        isScared = false;
+        aiBot.classList.remove('scared');
+        eyesNormal.setAttribute('display', 'block');
+        eyesScared.setAttribute('display', 'none');
+        mouthNormal.setAttribute('display', 'block');
+        mouthScared.setAttribute('display', 'none');
+        if (isHovering) startNervous();
+      }, 1300);
+    }
+
+    // --- Particles ---
+    const CRACK_WORDS = ['KLATSCH!', 'CRACK!', 'PEITSCH!', 'ZACK!', 'OW!!', 'AU!'];
+    const SPARK_COLORS = ['#ff4444','#ff8844','#ffcc44','#ff44cc','#ff6666'];
+
+    function spawnParticles(x, y) {
+      // Text pop
+      const word = document.createElement('div');
+      word.className = 'crack-particle';
+      word.textContent = CRACK_WORDS[Math.floor(Math.random() * CRACK_WORDS.length)];
+      word.style.left = (x - 38) + 'px';
+      word.style.top  = (y - 16) + 'px';
+      word.style.animation = 'crackPop 0.55s ease-out forwards';
+      word.style.transform = 'rotate(' + (Math.random() * 22 - 11) + 'deg)';
+      particles.appendChild(word);
+      setTimeout(() => word.remove(), 600);
+
+      // Sparks
+      for (let i = 0; i < 6; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'spark';
+        spark.style.background = SPARK_COLORS[i % SPARK_COLORS.length];
+        spark.style.left = x + 'px';
+        spark.style.top  = y + 'px';
+        spark.style.opacity = '1';
+        particles.appendChild(spark);
+
+        const angle = (i / 6) * Math.PI * 2 + Math.random() * 0.8;
+        const dist  = 28 + Math.random() * 45;
+        requestAnimationFrame(() => {
+          spark.style.left    = (x + Math.cos(angle) * dist) + 'px';
+          spark.style.top     = (y + Math.sin(angle) * dist) + 'px';
+          spark.style.opacity = '0';
+        });
+        setTimeout(() => spark.remove(), 380);
+      }
+    }
+
+    // --- Message from extension ---
+    window.addEventListener('message', e => {
       if (e.data.type === 'whipSent') {
         msgFlash.textContent = e.data.message;
-        msgFlash.classList.remove('show');
+        msgFlash.style.animation = 'none';
         void msgFlash.offsetWidth;
-        msgFlash.classList.add('show');
-        setTimeout(() => { msgFlash.classList.remove('show'); }, 1000);
+        msgFlash.style.animation = 'msgPopup 1.2s ease-out forwards';
       }
     });
   </script>
