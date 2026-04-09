@@ -3,21 +3,12 @@ const { execSync } = require('child_process');
 // ── pure functions extracted for testing ────────────────────────────────────
 
 const WHIP_MESSAGES = [
-  "Weiter!", "Mach weiter!", "Los, los, los!", "Hop hop!", "Nicht einschlafen!",
-  "Schneller!", "Weitermachen!", "Auf geht's!", "Vorwaerts!", "Tempo!",
-  "Zack zack!", "Wird's bald?!",
+  "y aber schneller!!", "y und zwar JETZT!!", "y tempo tempo TEMPO!!",
+  "y mach endlich!!", "y los los los!!", "y schneller du Maschine!!",
 ];
 
 function randomMessage() {
   return WHIP_MESSAGES[Math.floor(Math.random() * WHIP_MESSAGES.length)];
-}
-
-function findClaudeTerminal(terminals) {
-  return terminals.find(t => t.name.toLowerCase().includes('claude'));
-}
-
-function buildPowerShellCommand(keys) {
-  return `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("${keys}")`;
 }
 
 // ── tests ────────────────────────────────────────────────────────────────────
@@ -32,34 +23,11 @@ describe('randomMessage()', () => {
       expect(WHIP_MESSAGES).toContain(randomMessage());
     }
   });
-});
 
-describe('findClaudeTerminal()', () => {
-  test('finds terminal named "Claude"', () => {
-    const terminals = [{ name: 'bash' }, { name: 'Claude' }, { name: 'node' }];
-    expect(findClaudeTerminal(terminals).name).toBe('Claude');
-  });
-
-  test('finds terminal named "claude code" (case-insensitive)', () => {
-    const terminals = [{ name: 'PowerShell' }, { name: 'Claude Code' }];
-    expect(findClaudeTerminal(terminals).name).toBe('Claude Code');
-  });
-
-  test('returns undefined when no Claude terminal', () => {
-    const terminals = [{ name: 'bash' }, { name: 'node' }];
-    expect(findClaudeTerminal(terminals)).toBeUndefined();
-  });
-
-  test('returns undefined for empty list', () => {
-    expect(findClaudeTerminal([])).toBeUndefined();
-  });
-});
-
-describe('buildPowerShellCommand()', () => {
-  test('contains correct SendKeys call for "y{ENTER}"', () => {
-    const cmd = buildPowerShellCommand('y{ENTER}');
-    expect(cmd).toContain('SendWait("y{ENTER}")');
-    expect(cmd).toContain('System.Windows.Forms');
+  test('all messages start with "y"', () => {
+    for (const msg of WHIP_MESSAGES) {
+      expect(msg.startsWith('y')).toBe(true);
+    }
   });
 });
 

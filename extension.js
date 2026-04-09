@@ -114,19 +114,27 @@ function randomMessage() {
 async function sendWhip(message) {
   const { exec } = require('child_process');
 
-  await vscode.env.clipboard.writeText(message);
+  try {
+    // 1. Focus Claude Code Extension Input
+    await vscode.commands.executeCommand('claude-vscode.focus');
 
-  // Fokus zurück zur Sidebar (Claude Code Chat sitzt da)
-  await vscode.commands.executeCommand('workbench.action.focusSideBar');
-  await new Promise(r => setTimeout(r, 200));
+    // 2. Message in Clipboard schreiben
+    await vscode.env.clipboard.writeText(message);
 
-  // Ctrl+V + Enter in was auch immer fokussiert ist
-  await new Promise(resolve => {
-    const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v{ENTER}')`;
-    exec(`powershell -NoProfile -NonInteractive -Command "${ps}"`, resolve);
-  });
+    // 3. Kurz warten bis Focus steht, dann Ctrl+V und Enter via OS-level SendKeys
+    await new Promise(resolve => setTimeout(resolve, 200));
 
-  return true;
+    exec(
+      'powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\'^v\'); Start-Sleep -Milliseconds 100; [System.Windows.Forms.SendKeys]::SendWait(\'{ENTER}\')"'
+    );
+
+    return { success: true, method: 'extension' };
+  } catch (err) {
+    vscode.window.showWarningMessage(
+      `Peitsche: Konnte Claude Code Extension nicht erreichen! Ist sie offen? Fehler: ${err.message}`
+    );
+    return { success: false, method: 'none' };
+  }
 }
 
 function getWhipHtml() {
@@ -423,7 +431,7 @@ function getWhipHtml() {
       <div class="message-flash" id="msgFlash"></div>
     </div>
 
-    <div class="hint">Hover &amp; Klick zum Auspeitschen</div>
+    <div class="hint"></div>
   </div>
 
   <!-- Particle container -->
@@ -626,8 +634,10 @@ function activate(context) {
       webviewView.webview.onDidReceiveMessage(async (msg) => {
         if (msg.type === 'whip') {
           const message = randomMessage();
-          await sendWhip(message);
-          webviewView.webview.postMessage({ type: 'whipSent', message });
+          const result = await sendWhip(message);
+          if (result.success) {
+            webviewView.webview.postMessage({ type: 'whipSent', message });
+          }
         }
       });
 
@@ -658,23 +668,25 @@ function activate(context) {
       return;
     }
     const message = randomMessage();
-    await sendWhip(message);
-    if (currentPanel) {
+    const result = await sendWhip(message);
+    if (result.success && currentPanel) {
       currentPanel.webview.postMessage({ type: 'whipSent', message });
     }
   });
 
-  // debug: zeige alle claude-related commands
+  // debug: zeige alle infos
   const debugCmd = vscode.commands.registerCommand('claude-peitsche.debug', async () => {
     const all = await vscode.commands.getCommands(true);
     const outputChannel = vscode.window.createOutputChannel('Peitsche Debug');
     outputChannel.show();
+    outputChannel.appendLine('=== Modus: Claude Code Extension (Webview) ===');
+    outputChannel.appendLine('  Sendet via: claude-vscode.focus + Clipboard + SendKeys');
+    outputChannel.appendLine('');
     outputChannel.appendLine('=== Alle Claude Commands ===');
-    all.filter(c => c.toLowerCase().includes('claude')).forEach(c => outputChannel.appendLine(c));
-    outputChannel.appendLine('=== Alle Chat Commands ===');
-    all.filter(c => c.toLowerCase().includes('chat')).forEach(c => outputChannel.appendLine(c));
-    outputChannel.appendLine('=== Alle Send/Submit Commands ===');
-    all.filter(c => c.toLowerCase().includes('send') || c.toLowerCase().includes('submit')).forEach(c => outputChannel.appendLine(c));
+    all.filter(c => c.toLowerCase().includes('claude')).forEach(c => outputChannel.appendLine('  ' + c));
+    outputChannel.appendLine('');
+    outputChannel.appendLine('=== Alle Chat/Send/Submit Commands ===');
+    all.filter(c => c.toLowerCase().includes('chat') || c.toLowerCase().includes('send') || c.toLowerCase().includes('submit')).forEach(c => outputChannel.appendLine('  ' + c));
   });
 
   context.subscriptions.push(statusBar, viewRegistration, toggleCmd, whipCmd, debugCmd);
