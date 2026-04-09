@@ -1,24 +1,25 @@
 {
   "name": "claude-peitsche",
   "displayName": "Claude Peitsche",
-  "description": "Peitsche deinen Claude Code an! Ein Whip-Button der 'Weiter' fuer dich drueckt.",
-  "version": "0.0.1",
+  "description": "Peitsche deinen Claude Code an! Hover-Whip ueber dem Chat.",
+  "version": "0.1.0",
   "publisher": "JannisArineo",
   "engines": {
     "vscode": "^1.94.0"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
         "command": "claude-peitsche.whip",
-        "title": "Peitsche! Claude antreiben",
+        "title": "Peitsche! Claude auspeitschen",
+        "category": "Claude Peitsche"
+      },
+      {
+        "command": "claude-peitsche.toggle",
+        "title": "Peitsche an/aus",
         "category": "Claude Peitsche"
       }
     ],
@@ -27,12 +28,33 @@
         "command": "claude-peitsche.whip",
         "key": "ctrl+shift+enter",
         "mac": "cmd+shift+enter"
+      },
+      {
+        "command": "claude-peitsche.toggle",
+        "key": "ctrl+shift+p ctrl+shift+w",
+        "mac": "cmd+shift+p cmd+shift+w"
       }
-    ]
+    ],
+    "views": {
+      "claude-peitsche-container": [
+        {
+          "type": "webview",
+          "id": "claude-peitsche.whipView",
+          "name": "Peitsche",
+          "when": "claude-peitsche.enabled"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "claude-peitsche-container",
+          "title": "Peitsche",
+          "icon": "$(zap)"
+        }
+      ]
+    }
   },
-  "extensionDependencies": [
-    "anthropic.claude-code"
-  ],
   "devDependencies": {
     "@vscode/vsce": "^3.7.1"
   }
